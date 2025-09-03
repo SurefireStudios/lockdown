@@ -1,0 +1,240 @@
+/**
+ * Admin styles for Custom Auth & Lockdown plugin
+ */
+
+/* Tab Navigation */
+.nav-tab-wrapper {
+    margin-bottom: 20px;
+}
+
+.tab-content {
+    background: #ffffff;
+    padding: 20px;
+    border: 1px solid #c3c4c7;
+    border-top: none;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+/* Form Table Enhancements */
+.form-table th {
+    width: 200px;
+    vertical-align: top;
+    padding-top: 15px;
+}
+
+.form-table td {
+    vertical-align: top;
+    padding-top: 10px;
+}
+
+/* Checkbox List for Pages */
+.form-table td div[style*="max-height"] {
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.form-table td div[style*="max-height"] label {
+    padding: 5px 10px;
+    margin: 0;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.form-table td div[style*="max-height"] label:last-child {
+    border-bottom: none;
+}
+
+.form-table td div[style*="max-height"] label:hover {
+    background-color: #f0f0f0;
+}
+
+/* Description text */
+.description {
+    color: #646970;
+    font-style: italic;
+    margin-top: 5px;
+}
+
+/* Success/Error Messages */
+.cal-admin-notice {
+    margin: 15px 0;
+    padding: 12px;
+    border-left: 4px solid #00a0d2;
+    background: #ffffff;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.cal-admin-notice.error {
+    border-left-color: #d63638;
+}
+
+.cal-admin-notice.success {
+    border-left-color: #00a32a;
+}
+
+/* Shortcode Display */
+.cal-shortcode-display {
+    background: #f6f7f7;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 10px 0;
+}
+
+.cal-shortcode-display code {
+    background: #23282d;
+    color: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 13px;
+}
+
+/* Settings Sections */
+.cal-settings-section {
+    margin-bottom: 30px;
+}
+
+.cal-settings-section h3 {
+    margin-top: 0;
+    border-bottom: 1px solid #e1e1e1;
+    padding-bottom: 10px;
+}
+
+/* Status Indicators */
+.cal-status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.cal-status-indicator.enabled {
+    background-color: #00a32a;
+}
+
+.cal-status-indicator.disabled {
+    background-color: #d63638;
+}
+
+/* Help Text */
+.cal-help-text {
+    background: #f0f6fc;
+    border: 1px solid #c3e4f8;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.cal-help-text h4 {
+    margin-top: 0;
+    color: #0073aa;
+}
+
+.cal-help-text ul {
+    margin-bottom: 0;
+}
+
+/* Loading States */
+.cal-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.cal-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: cal-spin 1s linear infinite;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+@keyframes cal-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Admin */
+@media screen and (max-width: 782px) {
+    .form-table th,
+    .form-table td {
+        display: block;
+        width: auto;
+        vertical-align: top;
+    }
+    
+    .form-table th {
+        padding-bottom: 0;
+        font-weight: 600;
+    }
+    
+    .form-table td {
+        padding-top: 5px;
+        padding-bottom: 20px;
+    }
+}
+
+/* Admin Bar Status */
+#wpadminbar .cal-lockdown-status {
+    color: #ffffff;
+}
+
+#wpadminbar .cal-lockdown-status:hover {
+    color: #00b9eb;
+}
+
+/* Quick Settings Toggle */
+.cal-quick-toggle {
+    display: inline-block;
+    margin-left: 10px;
+}
+
+.cal-quick-toggle input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+/* Page Selection Helper */
+.cal-page-selector {
+    position: relative;
+}
+
+.cal-page-selector .select2-container {
+    min-width: 300px;
+}
+
+/* Bulk Actions */
+.cal-bulk-actions {
+    margin: 10px 0;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.cal-bulk-actions select,
+.cal-bulk-actions button {
+    margin-right: 10px;
+}
+
+/* Plugin Info Box */
+.cal-info-box {
+    background: #ffffff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.cal-info-box h3 {
+    margin-top: 0;
+    color: #23282d;
+}
+
+.cal-info-box .button {
+    margin-top: 10px;
+}

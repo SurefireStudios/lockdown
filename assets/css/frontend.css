@@ -1,0 +1,362 @@
+/**
+ * Frontend styles for Custom Auth & Lockdown plugin
+ * 
+ * @package CustomAuthLockdown
+ * @author Surefire Studios
+ * @link https://www.surefirestudios.io
+ * @since 1.0.0
+ */
+
+/* Form Container Styles */
+.cal-login-form-container,
+.cal-register-form-container,
+.cal-forgot-password-form-container,
+.cal-password-reset-form-container {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Form Styles */
+.cal-form {
+    background: #ffffff;
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Form Group Styles */
+.cal-form-group {
+    margin-bottom: 20px;
+}
+
+.cal-form-group:last-child {
+    margin-bottom: 0;
+}
+
+/* Label Styles */
+.cal-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333333;
+    font-size: 14px;
+}
+
+/* Input Styles */
+.cal-form input[type="text"],
+.cal-form input[type="email"],
+.cal-form input[type="password"],
+.cal-form input[type="url"],
+.cal-form textarea {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    box-sizing: border-box;
+}
+
+.cal-form input[type="text"]:focus,
+.cal-form input[type="email"]:focus,
+.cal-form input[type="password"]:focus,
+.cal-form input[type="url"]:focus,
+.cal-form textarea:focus {
+    outline: none;
+    border-color: #007cba;
+    box-shadow: 0 0 0 3px rgba(0, 124, 186, 0.1);
+}
+
+/* Checkbox Styles */
+.cal-form input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.cal-form label input[type="checkbox"] {
+    margin-right: 8px;
+    margin-bottom: 0;
+}
+
+/* Button Styles */
+.cal-submit-btn {
+    width: 100%;
+    padding: 12px 20px;
+    background-color: #007cba;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.cal-submit-btn:hover {
+    background-color: #005a87;
+}
+
+.cal-submit-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* Loading State */
+.cal-submit-btn.loading {
+    position: relative;
+    color: transparent;
+}
+
+.cal-submit-btn.loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: cal-spin 1s linear infinite;
+}
+
+@keyframes cal-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Message Styles */
+.cal-form-messages {
+    margin-top: 15px;
+}
+
+.cal-message {
+    padding: 12px 15px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.cal-message:last-child {
+    margin-bottom: 0;
+}
+
+.cal-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.cal-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.cal-message.info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+/* Form Links */
+.cal-form-links {
+    margin-top: 20px;
+    text-align: center;
+    border-top: 1px solid #e1e1e1;
+    padding-top: 20px;
+}
+
+.cal-form-links a {
+    color: #007cba;
+    text-decoration: none;
+    font-size: 14px;
+    margin: 0 10px;
+}
+
+.cal-form-links a:hover {
+    text-decoration: underline;
+}
+
+/* Logout Link */
+.cal-logout-link {
+    color: #007cba;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.cal-logout-link:hover {
+    text-decoration: underline;
+}
+
+/* User Info */
+.cal-user-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cal-user-avatar {
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.cal-user-display-name,
+.cal-user-username,
+.cal-user-email,
+.cal-user-first-name,
+.cal-user-last-name,
+.cal-user-full-name {
+    font-weight: 500;
+}
+
+.cal-logged-out-text {
+    font-style: italic;
+    color: #666666;
+}
+
+/* Already Logged In Message */
+.cal-already-logged-in {
+    background-color: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+    padding: 15px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.cal-already-logged-in p {
+    margin: 0;
+}
+
+/* Lockdown Container */
+.cal-lockdown-container {
+    text-align: center;
+    padding: 60px 20px;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cal-lockdown-message {
+    max-width: 500px;
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.cal-lockdown-message h2 {
+    color: #333333;
+    margin-bottom: 20px;
+    font-size: 28px;
+}
+
+.cal-lockdown-message p {
+    color: #666666;
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.cal-login-link.button {
+    display: inline-block;
+    padding: 12px 24px;
+    background-color: #007cba;
+    color: #ffffff;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
+}
+
+.cal-login-link.button:hover {
+    background-color: #005a87;
+    color: #ffffff;
+}
+
+/* Login Status */
+.cal-logged-in-status,
+.cal-logged-out-status {
+    padding: 10px 15px;
+    border-radius: 4px;
+    font-size: 14px;
+    margin: 10px 0;
+}
+
+.cal-logged-in-status {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.cal-logged-out-status {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .cal-login-form-container,
+    .cal-register-form-container,
+    .cal-forgot-password-form-container,
+    .cal-password-reset-form-container {
+        padding: 10px;
+    }
+    
+    .cal-form {
+        padding: 20px;
+    }
+    
+    .cal-lockdown-message {
+        padding: 30px 20px;
+    }
+    
+    .cal-lockdown-message h2 {
+        font-size: 24px;
+    }
+    
+    .cal-form-links a {
+        display: block;
+        margin: 5px 0;
+    }
+}
+
+/* Error States */
+.cal-form input.error {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.cal-form input.error:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+/* Accessibility */
+.cal-form input:focus,
+.cal-submit-btn:focus,
+.cal-logout-link:focus,
+.cal-form-links a:focus {
+    outline: 2px solid #007cba;
+    outline-offset: 2px;
+}
+
+/* Screen reader only text */
+.cal-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
