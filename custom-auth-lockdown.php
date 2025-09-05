@@ -74,6 +74,9 @@ class CustomAuthLockdown {
     }
     
     public function plugins_loaded() {
+        // Run migration check every time plugin loads (safe to run multiple times)
+        $this->migrate_existing_users();
+        
         // Initialize admin interface
         if (is_admin()) {
             new CAL_Admin();
@@ -131,13 +134,50 @@ class CustomAuthLockdown {
             'role_redirects' => array(),
             'logout_role_redirects' => array(),
             'disable_wp_login' => false,
-            'lockdown_message' => __('Please log in to access this content.', 'custom-auth-lockdown')
+            'lockdown_message' => __('Please log in to access this content.', 'custom-auth-lockdown'),
+            'require_admin_approval' => false,
+            'approval_pending_message' => __('Your account is pending administrator approval. Please wait for approval before logging in.', 'custom-auth-lockdown'),
+            'approval_success_message' => __('Your account has been approved! You can now log in.', 'custom-auth-lockdown'),
+            'approval_rejection_message' => __('Your registration has been rejected.', 'custom-auth-lockdown'),
+            'send_approval_emails' => true
         );
         
         add_option('cal_options', $default_options);
         
+        // Migrate existing users to approved status
+        $this->migrate_existing_users();
+        
         // Flush rewrite rules
         flush_rewrite_rules();
+    }
+    
+    /**
+     * Migrate existing users to have approved status
+     */
+    private function migrate_existing_users() {
+        // Check if migration has already been done
+        if (get_option('cal_user_approval_migration_done')) {
+            return;
+        }
+        
+        // Get all users without approval status
+        $users = get_users(array(
+            'meta_query' => array(
+                array(
+                    'key' => 'cal_approval_status',
+                    'compare' => 'NOT EXISTS'
+                )
+            ),
+            'fields' => 'ID'
+        ));
+        
+        // Set all existing users as approved
+        foreach ($users as $user_id) {
+            update_user_meta($user_id, 'cal_approval_status', 'approved');
+        }
+        
+        // Mark migration as complete
+        update_option('cal_user_approval_migration_done', true);
     }
     
     public function deactivate() {

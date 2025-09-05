@@ -101,6 +101,57 @@
                 e.preventDefault();
                 CAL_Admin.clearCache();
             });
+
+            // User approval/rejection buttons
+            $('.cal-approve-user').on('click', function(e) {
+                e.preventDefault();
+                var userId = $(this).data('user-id');
+                CAL_Admin.approveUser(userId, $(this));
+            });
+
+            $('.cal-reject-user').on('click', function(e) {
+                e.preventDefault();
+                var userId = $(this).data('user-id');
+                CAL_Admin.rejectUser(userId, $(this));
+            });
+
+            // Bulk approval functionality
+            $('#cal-bulk-select-all').on('change', function() {
+                var isChecked = $(this).is(':checked');
+                $('.cal-user-checkbox').prop('checked', isChecked);
+                CAL_Admin.updateBulkActionButtons();
+            });
+
+            $('.cal-user-checkbox').on('change', function() {
+                CAL_Admin.updateBulkActionButtons();
+                
+                // Update select all checkbox
+                var totalCheckboxes = $('.cal-user-checkbox').length;
+                var checkedCheckboxes = $('.cal-user-checkbox:checked').length;
+                $('#cal-bulk-select-all').prop('checked', totalCheckboxes === checkedCheckboxes);
+            });
+
+            $('.cal-bulk-approve').on('click', function(e) {
+                e.preventDefault();
+                CAL_Admin.bulkApproveUsers();
+            });
+
+            $('.cal-bulk-reject').on('click', function(e) {
+                e.preventDefault();
+                CAL_Admin.bulkRejectUsers();
+            });
+
+            // Migration button
+            $('.cal-migrate-users').on('click', function(e) {
+                e.preventDefault();
+                CAL_Admin.migrateExistingUsers();
+            });
+
+            // Emergency disable button
+            $('.cal-emergency-disable').on('click', function(e) {
+                e.preventDefault();
+                CAL_Admin.emergencyDisable();
+            });
         },
 
         addAdminBarQuickToggle: function() {
@@ -138,6 +189,293 @@
                 },
                 error: function() {
                     CAL_Admin.showNotice('An error occurred while clearing cache.', 'error');
+                }
+            });
+        },
+
+        approveUser: function(userId, $button) {
+            if (!confirm('Are you sure you want to approve this user?')) {
+                return;
+            }
+
+            var originalText = $button.text();
+            CAL_Admin.setLoadingState($button, true);
+            $button.text('Approving...');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cal_approve_user',
+                    user_id: userId,
+                    nonce: window.cal_ajax ? window.cal_ajax.nonce : ''
+                },
+                success: function(response) {
+                    if (response.success) {
+                        CAL_Admin.showNotice('User approved successfully!', 'success');
+                        // Remove the row or update the status
+                        var $row = $button.closest('tr');
+                        if ($row.length) {
+                            $row.fadeOut(function() {
+                                $row.remove();
+                                // Check if table is empty
+                                if ($('.cal-pending-users-list tbody tr').length === 0) {
+                                    location.reload();
+                                }
+                            });
+                        } else {
+                            location.reload();
+                        }
+                    } else {
+                        CAL_Admin.showNotice(response.data || 'Failed to approve user.', 'error');
+                        $button.text(originalText);
+                        CAL_Admin.setLoadingState($button, false);
+                    }
+                },
+                error: function() {
+                    CAL_Admin.showNotice('An error occurred while approving user.', 'error');
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
+                }
+            });
+        },
+
+        rejectUser: function(userId, $button) {
+            if (!confirm('Are you sure you want to reject this user? This action cannot be undone.')) {
+                return;
+            }
+
+            var originalText = $button.text();
+            CAL_Admin.setLoadingState($button, true);
+            $button.text('Rejecting...');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cal_reject_user',
+                    user_id: userId,
+                    nonce: window.cal_ajax ? window.cal_ajax.nonce : ''
+                },
+                success: function(response) {
+                    if (response.success) {
+                        CAL_Admin.showNotice('User rejected successfully.', 'success');
+                        // Remove the row or update the status
+                        var $row = $button.closest('tr');
+                        if ($row.length) {
+                            $row.fadeOut(function() {
+                                $row.remove();
+                                // Check if table is empty
+                                if ($('.cal-pending-users-list tbody tr').length === 0) {
+                                    location.reload();
+                                }
+                            });
+                        } else {
+                            location.reload();
+                        }
+                    } else {
+                        CAL_Admin.showNotice(response.data || 'Failed to reject user.', 'error');
+                        $button.text(originalText);
+                        CAL_Admin.setLoadingState($button, false);
+                    }
+                },
+                error: function() {
+                    CAL_Admin.showNotice('An error occurred while rejecting user.', 'error');
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
+                }
+            });
+        },
+
+        updateBulkActionButtons: function() {
+            var checkedBoxes = $('.cal-user-checkbox:checked');
+            var hasSelection = checkedBoxes.length > 0;
+            
+            $('.cal-bulk-approve, .cal-bulk-reject').prop('disabled', !hasSelection);
+        },
+
+        bulkApproveUsers: function() {
+            var selectedUsers = $('.cal-user-checkbox:checked').map(function() {
+                return $(this).val();
+            }).get();
+
+            if (selectedUsers.length === 0) {
+                alert('Please select users to approve.');
+                return;
+            }
+
+            var confirmMessage = 'Are you sure you want to approve ' + selectedUsers.length + ' user(s)?';
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            var $button = $('.cal-bulk-approve');
+            var originalText = $button.text();
+            CAL_Admin.setLoadingState($button, true);
+            $button.text('Approving...');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cal_bulk_approve_users',
+                    user_ids: selectedUsers,
+                    nonce: window.cal_ajax ? window.cal_ajax.nonce : ''
+                },
+                success: function(response) {
+                    if (response.success) {
+                        CAL_Admin.showNotice(response.data.message, 'success');
+                        // Remove approved rows
+                        $('.cal-user-checkbox:checked').closest('tr').fadeOut(function() {
+                            $(this).remove();
+                            if ($('.cal-pending-users-list tbody tr').length === 0) {
+                                location.reload();
+                            }
+                        });
+                        CAL_Admin.updateBulkActionButtons();
+                        $('#cal-bulk-select-all').prop('checked', false);
+                    } else {
+                        CAL_Admin.showNotice(response.data || 'Failed to approve users.', 'error');
+                    }
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
+                },
+                error: function() {
+                    CAL_Admin.showNotice('An error occurred while approving users.', 'error');
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
+                }
+            });
+        },
+
+        bulkRejectUsers: function() {
+            var selectedUsers = $('.cal-user-checkbox:checked').map(function() {
+                return $(this).val();
+            }).get();
+
+            if (selectedUsers.length === 0) {
+                alert('Please select users to reject.');
+                return;
+            }
+
+            var confirmMessage = 'Are you sure you want to reject ' + selectedUsers.length + ' user(s)? This action cannot be undone.';
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            var $button = $('.cal-bulk-reject');
+            var originalText = $button.text();
+            CAL_Admin.setLoadingState($button, true);
+            $button.text('Rejecting...');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cal_bulk_reject_users',
+                    user_ids: selectedUsers,
+                    nonce: window.cal_ajax ? window.cal_ajax.nonce : ''
+                },
+                success: function(response) {
+                    if (response.success) {
+                        CAL_Admin.showNotice(response.data.message, 'success');
+                        // Remove rejected rows
+                        $('.cal-user-checkbox:checked').closest('tr').fadeOut(function() {
+                            $(this).remove();
+                            if ($('.cal-pending-users-list tbody tr').length === 0) {
+                                location.reload();
+                            }
+                        });
+                        CAL_Admin.updateBulkActionButtons();
+                        $('#cal-bulk-select-all').prop('checked', false);
+                    } else {
+                        CAL_Admin.showNotice(response.data || 'Failed to reject users.', 'error');
+                    }
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
+                },
+                error: function() {
+                    CAL_Admin.showNotice('An error occurred while rejecting users.', 'error');
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
+                }
+            });
+        },
+
+        migrateExistingUsers: function() {
+            var confirmMessage = 'This will set all existing users without approval status to "approved". Are you sure you want to continue?';
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            var $button = $('.cal-migrate-users');
+            var originalText = $button.text();
+            CAL_Admin.setLoadingState($button, true);
+            $button.text('Migrating...');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cal_migrate_existing_users',
+                    nonce: window.cal_ajax ? window.cal_ajax.nonce : ''
+                },
+                success: function(response) {
+                    if (response.success) {
+                        CAL_Admin.showNotice(response.data.message, 'success');
+                        // Hide the migration section or reload to show updated status
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        CAL_Admin.showNotice(response.data || 'Migration failed.', 'error');
+                    }
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
+                },
+                error: function() {
+                    CAL_Admin.showNotice('An error occurred during migration.', 'error');
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
+                }
+            });
+        },
+
+        emergencyDisable: function() {
+            var confirmMessage = 'This will turn off both "Require Admin Approval" and "Disable WP Login Access" to resolve login issues. Continue?';
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            var $button = $('.cal-emergency-disable');
+            var originalText = $button.text();
+            CAL_Admin.setLoadingState($button, true);
+            $button.text('Disabling...');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cal_emergency_disable',
+                    nonce: window.cal_ajax ? window.cal_ajax.nonce : ''
+                },
+                success: function(response) {
+                    if (response.success) {
+                        CAL_Admin.showNotice(response.data.message, 'success');
+                        // Reload page to show updated settings
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        CAL_Admin.showNotice(response.data || 'Emergency disable failed.', 'error');
+                    }
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
+                },
+                error: function() {
+                    CAL_Admin.showNotice('An error occurred during emergency disable.', 'error');
+                    $button.text(originalText);
+                    CAL_Admin.setLoadingState($button, false);
                 }
             });
         },

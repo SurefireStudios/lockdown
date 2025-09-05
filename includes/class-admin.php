@@ -19,6 +19,19 @@ class CAL_Admin {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'register_settings'));
         add_action('wp_ajax_cal_save_settings', array($this, 'save_settings_ajax'));
+        add_action('wp_ajax_cal_approve_user', array($this, 'approve_user_ajax'));
+        add_action('wp_ajax_cal_reject_user', array($this, 'reject_user_ajax'));
+        add_action('wp_ajax_cal_bulk_approve_users', array($this, 'bulk_approve_users_ajax'));
+        add_action('wp_ajax_cal_bulk_reject_users', array($this, 'bulk_reject_users_ajax'));
+        add_action('wp_ajax_cal_migrate_existing_users', array($this, 'migrate_existing_users_ajax'));
+        add_action('wp_ajax_cal_emergency_disable', array($this, 'emergency_disable_ajax'));
+        
+        // Add users list page filters
+        add_filter('pre_get_users', array($this, 'filter_users_list'));
+        add_filter('views_users', array($this, 'add_pending_users_view'));
+        add_filter('manage_users_columns', array($this, 'add_approval_status_column'));
+        add_action('manage_users_custom_column', array($this, 'show_approval_status_column'), 10, 3);
+        add_filter('user_row_actions', array($this, 'add_user_row_actions'), 10, 2);
     }
     
     public function add_admin_menu() {
@@ -44,6 +57,7 @@ class CAL_Admin {
             
             <div class="nav-tab-wrapper">
                 <a href="#custom-pages" class="nav-tab nav-tab-active"><?php _e('Custom Pages', 'custom-auth-lockdown'); ?></a>
+                <a href="#user-approval" class="nav-tab"><?php _e('User Approval', 'custom-auth-lockdown'); ?></a>
                 <a href="#lockdown" class="nav-tab"><?php _e('Site Lockdown', 'custom-auth-lockdown'); ?></a>
                 <a href="#advanced" class="nav-tab"><?php _e('Advanced', 'custom-auth-lockdown'); ?></a>
             </div>
@@ -218,6 +232,189 @@ class CAL_Admin {
                                     <?php _e('Redirect wp-login.php to custom login page', 'custom-auth-lockdown'); ?>
                                 </label>
                                 <p class="description"><?php _e('When enabled, users will be redirected from wp-login.php to your custom login page.', 'custom-auth-lockdown'); ?></p>
+                                <?php if (isset($options['disable_wp_login']) && $options['disable_wp_login']): ?>
+                                    <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+                                        <strong><?php _e('⚠️ Troubleshooting:', 'custom-auth-lockdown'); ?></strong>
+                                        <p><?php _e('If you\'re experiencing login loops, try temporarily disabling this option. Some WordPress admin functions (like the Customizer) require direct access to wp-login.php for re-authentication.', 'custom-auth-lockdown'); ?></p>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <!-- User Approval Tab -->
+                <div id="user-approval" class="tab-content" style="display: none;">
+                    <h2><?php _e('User Registration Approval', 'custom-auth-lockdown'); ?></h2>
+                    <p><?php _e('Control whether new user registrations require administrator approval before users can log in.', 'custom-auth-lockdown'); ?></p>
+                    
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row"><?php _e('Require Admin Approval', 'custom-auth-lockdown'); ?></th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="cal_options[require_admin_approval]" value="1" <?php checked(isset($options['require_admin_approval']) ? $options['require_admin_approval'] : false, 1); ?> />
+                                    <?php _e('New users must be approved by an administrator before they can log in', 'custom-auth-lockdown'); ?>
+                                </label>
+                                <p class="description"><?php _e('When enabled, newly registered users will have a "pending" status and cannot log in until approved.', 'custom-auth-lockdown'); ?></p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row"><?php _e('Send Email Notifications', 'custom-auth-lockdown'); ?></th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="cal_options[send_approval_emails]" value="1" <?php checked(isset($options['send_approval_emails']) ? $options['send_approval_emails'] : true, 1); ?> />
+                                    <?php _e('Send email notifications for approval events', 'custom-auth-lockdown'); ?>
+                                </label>
+                                <p class="description"><?php _e('When enabled, users and administrators will receive email notifications about registration and approval status changes.', 'custom-auth-lockdown'); ?></p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row"><?php _e('Pending Approval Message', 'custom-auth-lockdown'); ?></th>
+                            <td>
+                                <textarea name="cal_options[approval_pending_message]" rows="3" cols="50" placeholder="<?php _e('Your account is pending administrator approval. Please wait for approval before logging in.', 'custom-auth-lockdown'); ?>"><?php echo esc_textarea(isset($options['approval_pending_message']) ? $options['approval_pending_message'] : ''); ?></textarea>
+                                <p class="description"><?php _e('Message shown to users when they try to log in with a pending account.', 'custom-auth-lockdown'); ?></p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row"><?php _e('Approval Success Message', 'custom-auth-lockdown'); ?></th>
+                            <td>
+                                <textarea name="cal_options[approval_success_message]" rows="3" cols="50" placeholder="<?php _e('Your account has been approved! You can now log in.', 'custom-auth-lockdown'); ?>"><?php echo esc_textarea(isset($options['approval_success_message']) ? $options['approval_success_message'] : ''); ?></textarea>
+                                <p class="description"><?php _e('Message sent to users when their account is approved.', 'custom-auth-lockdown'); ?></p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row"><?php _e('Rejection Message', 'custom-auth-lockdown'); ?></th>
+                            <td>
+                                <textarea name="cal_options[approval_rejection_message]" rows="3" cols="50" placeholder="<?php _e('Your registration has been rejected.', 'custom-auth-lockdown'); ?>"><?php echo esc_textarea(isset($options['approval_rejection_message']) ? $options['approval_rejection_message'] : ''); ?></textarea>
+                                <p class="description"><?php _e('Message sent to users when their registration is rejected.', 'custom-auth-lockdown'); ?></p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row"><?php _e('Migration Tool', 'custom-auth-lockdown'); ?></th>
+                            <td>
+                                <?php
+                                $migration_done = get_option('cal_user_approval_migration_done');
+                                $users_without_status = get_users(array(
+                                    'meta_query' => array(
+                                        array(
+                                            'key' => 'cal_approval_status',
+                                            'compare' => 'NOT EXISTS'
+                                        )
+                                    ),
+                                    'fields' => 'ID',
+                                    'number' => 1
+                                ));
+                                ?>
+                                <?php if (!$migration_done || !empty($users_without_status)): ?>
+                                    <p><?php _e('Some existing users may not have approval status set. Click the button below to set all existing users as "approved".', 'custom-auth-lockdown'); ?></p>
+                                    <button type="button" class="button button-secondary cal-migrate-users">
+                                        <?php _e('Migrate Existing Users', 'custom-auth-lockdown'); ?>
+                                    </button>
+                                    <p class="description"><?php _e('This will set all existing users without approval status to "approved". This is safe to run multiple times.', 'custom-auth-lockdown'); ?></p>
+                                <?php else: ?>
+                                    <p style="color: #00a32a;"><?php _e('✓ All users have been migrated and have approval status.', 'custom-auth-lockdown'); ?></p>
+                                <?php endif; ?>
+                                
+                                <!-- Debug Information -->
+                                <div style="margin-top: 20px; padding: 15px; background: #f0f0f0; border: 1px solid #ccc;">
+                                    <h4><?php _e('Debug Information', 'custom-auth-lockdown'); ?></h4>
+                                    <?php
+                                    $current_user = wp_get_current_user();
+                                    $user_approval_status = get_user_meta($current_user->ID, 'cal_approval_status', true);
+                                    $is_admin = user_can($current_user->ID, 'manage_options');
+                                    ?>
+                                    <p><strong><?php _e('Current User:', 'custom-auth-lockdown'); ?></strong> <?php echo esc_html($current_user->user_login); ?></p>
+                                    <p><strong><?php _e('User ID:', 'custom-auth-lockdown'); ?></strong> <?php echo $current_user->ID; ?></p>
+                                    <p><strong><?php _e('Is Administrator:', 'custom-auth-lockdown'); ?></strong> <?php echo $is_admin ? 'Yes' : 'No'; ?></p>
+                                    <p><strong><?php _e('Approval Status:', 'custom-auth-lockdown'); ?></strong> <?php echo $user_approval_status ? $user_approval_status : 'Not Set'; ?></p>
+                                    <p><strong><?php _e('Migration Done:', 'custom-auth-lockdown'); ?></strong> <?php echo $migration_done ? 'Yes' : 'No'; ?></p>
+                                    <p><strong><?php _e('Disable WP Login:', 'custom-auth-lockdown'); ?></strong> <?php echo (isset($options['disable_wp_login']) && $options['disable_wp_login']) ? 'Enabled' : 'Disabled'; ?></p>
+                                    <p><strong><?php _e('Require Admin Approval:', 'custom-auth-lockdown'); ?></strong> <?php echo (isset($options['require_admin_approval']) && $options['require_admin_approval']) ? 'Enabled' : 'Disabled'; ?></p>
+                                    
+                                    <!-- Emergency Troubleshooting -->
+                                    <div style="margin-top: 15px; padding: 10px; background: #ffe6e6; border: 1px solid #ff9999; border-radius: 4px;">
+                                        <h5 style="margin-top: 0; color: #cc0000;"><?php _e('🚨 Emergency Troubleshooting', 'custom-auth-lockdown'); ?></h5>
+                                        <p><?php _e('If you\'re still experiencing login loops, temporarily disable the approval system:', 'custom-auth-lockdown'); ?></p>
+                                        <button type="button" class="button button-secondary cal-emergency-disable">
+                                            <?php _e('Temporarily Disable Approval System', 'custom-auth-lockdown'); ?>
+                                        </button>
+                                        <p class="description"><?php _e('This will turn off both "Require Admin Approval" and "Disable WP Login Access" to resolve login issues.', 'custom-auth-lockdown'); ?></p>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th scope="row"><?php _e('Manage Pending Users', 'custom-auth-lockdown'); ?></th>
+                            <td>
+                                <?php
+                                // Get pending users
+                                $pending_users = get_users(array(
+                                    'meta_key' => 'cal_approval_status',
+                                    'meta_value' => 'pending',
+                                    'number' => 10
+                                ));
+                                ?>
+                                <?php if (!empty($pending_users)): ?>
+                                    <div class="cal-pending-users-list">
+                                        <p><strong><?php printf(_n('%d user pending approval:', '%d users pending approval:', count($pending_users), 'custom-auth-lockdown'), count($pending_users)); ?></strong></p>
+                                        
+                                        <!-- Bulk Actions -->
+                                        <div class="cal-bulk-approval-actions">
+                                            <label for="cal-bulk-select-all">
+                                                <input type="checkbox" id="cal-bulk-select-all"> <?php _e('Select All', 'custom-auth-lockdown'); ?>
+                                            </label>
+                                            <button type="button" class="button button-primary cal-bulk-approve" disabled>
+                                                <?php _e('Bulk Approve', 'custom-auth-lockdown'); ?>
+                                            </button>
+                                            <button type="button" class="button cal-bulk-reject" disabled>
+                                                <?php _e('Bulk Reject', 'custom-auth-lockdown'); ?>
+                                            </button>
+                                        </div>
+                                        
+                                        <table class="widefat">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 30px;"><?php _e('Select', 'custom-auth-lockdown'); ?></th>
+                                                    <th><?php _e('Username', 'custom-auth-lockdown'); ?></th>
+                                                    <th><?php _e('Email', 'custom-auth-lockdown'); ?></th>
+                                                    <th><?php _e('Registration Date', 'custom-auth-lockdown'); ?></th>
+                                                    <th><?php _e('Actions', 'custom-auth-lockdown'); ?></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($pending_users as $user): ?>
+                                                    <tr>
+                                                        <td>
+                                                            <input type="checkbox" class="cal-user-checkbox" value="<?php echo $user->ID; ?>">
+                                                        </td>
+                                                        <td><?php echo esc_html($user->user_login); ?></td>
+                                                        <td><?php echo esc_html($user->user_email); ?></td>
+                                                        <td><?php echo esc_html(date_i18n(get_option('date_format'), strtotime($user->user_registered))); ?></td>
+                                                        <td>
+                                                            <button type="button" class="button button-primary cal-approve-user" data-user-id="<?php echo $user->ID; ?>">
+                                                                <?php _e('Approve', 'custom-auth-lockdown'); ?>
+                                                            </button>
+                                                            <button type="button" class="button cal-reject-user" data-user-id="<?php echo $user->ID; ?>">
+                                                                <?php _e('Reject', 'custom-auth-lockdown'); ?>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                        <p><a href="<?php echo admin_url('users.php?cal_filter=pending'); ?>" class="button"><?php _e('View All Pending Users', 'custom-auth-lockdown'); ?></a></p>
+                                    </div>
+                                <?php else: ?>
+                                    <p><?php _e('No users pending approval.', 'custom-auth-lockdown'); ?></p>
+                                    <p><a href="<?php echo admin_url('users.php'); ?>" class="button"><?php _e('Manage All Users', 'custom-auth-lockdown'); ?></a></p>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     </table>
@@ -372,6 +569,14 @@ class CAL_Admin {
             }
         }
         
+        // Sanitize textarea fields
+        $textarea_fields = array('approval_pending_message', 'approval_success_message', 'approval_rejection_message');
+        foreach ($textarea_fields as $field) {
+            if (isset($input[$field])) {
+                $sanitized[$field] = sanitize_textarea_field($input[$field]);
+            }
+        }
+        
         // Sanitize select fields
         $select_fields = array('custom_login_page', 'custom_register_page', 'custom_forgot_password_page', 'login_redirect_page', 'logout_redirect_page');
         foreach ($select_fields as $field) {
@@ -413,7 +618,7 @@ class CAL_Admin {
         }
         
         // Sanitize checkbox fields
-        $checkbox_fields = array('lockdown_enabled', 'disable_wp_login');
+        $checkbox_fields = array('lockdown_enabled', 'disable_wp_login', 'require_admin_approval', 'send_approval_emails');
         foreach ($checkbox_fields as $field) {
             $sanitized[$field] = isset($input[$field]) ? 1 : 0;
         }
@@ -437,5 +642,326 @@ class CAL_Admin {
         
         // Handle AJAX save if needed
         wp_send_json_success(__('Settings saved successfully.', 'custom-auth-lockdown'));
+    }
+    
+    public function approve_user_ajax() {
+        check_ajax_referer('cal_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('You do not have sufficient permissions.', 'custom-auth-lockdown'));
+        }
+        
+        $user_id = absint($_POST['user_id']);
+        if (!$user_id) {
+            wp_send_json_error(__('Invalid user ID.', 'custom-auth-lockdown'));
+        }
+        
+        $user = get_user_by('id', $user_id);
+        if (!$user) {
+            wp_send_json_error(__('User not found.', 'custom-auth-lockdown'));
+        }
+        
+        // Update user approval status
+        update_user_meta($user_id, 'cal_approval_status', 'approved');
+        
+        // Send approval email
+        $options = get_option('cal_options', array());
+        if (isset($options['send_approval_emails']) && $options['send_approval_emails']) {
+            $this->send_approval_email($user, 'approved');
+        }
+        
+        wp_send_json_success(__('User approved successfully.', 'custom-auth-lockdown'));
+    }
+    
+    public function reject_user_ajax() {
+        check_ajax_referer('cal_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('You do not have sufficient permissions.', 'custom-auth-lockdown'));
+        }
+        
+        $user_id = absint($_POST['user_id']);
+        if (!$user_id) {
+            wp_send_json_error(__('Invalid user ID.', 'custom-auth-lockdown'));
+        }
+        
+        $user = get_user_by('id', $user_id);
+        if (!$user) {
+            wp_send_json_error(__('User not found.', 'custom-auth-lockdown'));
+        }
+        
+        // Update user approval status
+        update_user_meta($user_id, 'cal_approval_status', 'rejected');
+        
+        // Send rejection email
+        $options = get_option('cal_options', array());
+        if (isset($options['send_approval_emails']) && $options['send_approval_emails']) {
+            $this->send_approval_email($user, 'rejected');
+        }
+        
+        wp_send_json_success(__('User rejected successfully.', 'custom-auth-lockdown'));
+    }
+    
+    public function filter_users_list($query) {
+        if (!is_admin() || !function_exists('get_current_screen')) {
+            return;
+        }
+        
+        $screen = get_current_screen();
+        if (!$screen || $screen->id !== 'users') {
+            return;
+        }
+        
+        if (isset($_GET['cal_filter']) && $_GET['cal_filter'] === 'pending') {
+            $query->set('meta_key', 'cal_approval_status');
+            $query->set('meta_value', 'pending');
+        }
+    }
+    
+    public function add_pending_users_view($views) {
+        $pending_count = count(get_users(array(
+            'meta_key' => 'cal_approval_status',
+            'meta_value' => 'pending',
+            'fields' => 'ID'
+        )));
+        
+        if ($pending_count > 0) {
+            $class = isset($_GET['cal_filter']) && $_GET['cal_filter'] === 'pending' ? 'current' : '';
+            $views['pending'] = sprintf(
+                '<a href="%s" class="%s">%s <span class="count">(%d)</span></a>',
+                add_query_arg('cal_filter', 'pending', admin_url('users.php')),
+                $class,
+                __('Pending Approval', 'custom-auth-lockdown'),
+                $pending_count
+            );
+        }
+        
+        return $views;
+    }
+    
+    public function add_approval_status_column($columns) {
+        $columns['cal_approval_status'] = __('Approval Status', 'custom-auth-lockdown');
+        return $columns;
+    }
+    
+    public function show_approval_status_column($output, $column_name, $user_id) {
+        if ($column_name === 'cal_approval_status') {
+            $status = get_user_meta($user_id, 'cal_approval_status', true);
+            
+            switch ($status) {
+                case 'pending':
+                    $output = '<span style="color: #ff6b6b;">' . __('Pending', 'custom-auth-lockdown') . '</span>';
+                    break;
+                case 'approved':
+                    $output = '<span style="color: #51cf66;">' . __('Approved', 'custom-auth-lockdown') . '</span>';
+                    break;
+                case 'rejected':
+                    $output = '<span style="color: #868e96;">' . __('Rejected', 'custom-auth-lockdown') . '</span>';
+                    break;
+                default:
+                    $output = '<span style="color: #51cf66;">' . __('Approved', 'custom-auth-lockdown') . '</span>';
+                    break;
+            }
+        }
+        
+        return $output;
+    }
+    
+    public function add_user_row_actions($actions, $user) {
+        $status = get_user_meta($user->ID, 'cal_approval_status', true);
+        
+        if ($status === 'pending') {
+            $actions['cal_approve'] = sprintf(
+                '<a href="#" class="cal-approve-user" data-user-id="%d">%s</a>',
+                $user->ID,
+                __('Approve', 'custom-auth-lockdown')
+            );
+            $actions['cal_reject'] = sprintf(
+                '<a href="#" class="cal-reject-user" data-user-id="%d">%s</a>',
+                $user->ID,
+                __('Reject', 'custom-auth-lockdown')
+            );
+        } elseif ($status === 'rejected') {
+            $actions['cal_approve'] = sprintf(
+                '<a href="#" class="cal-approve-user" data-user-id="%d">%s</a>',
+                $user->ID,
+                __('Approve', 'custom-auth-lockdown')
+            );
+        }
+        
+        return $actions;
+    }
+    
+    private function send_approval_email($user, $status) {
+        $options = get_option('cal_options', array());
+        
+        if ($status === 'approved') {
+            $subject = sprintf(__('[%s] Account Approved'), get_option('blogname'));
+            $message = isset($options['approval_success_message']) && !empty($options['approval_success_message']) 
+                ? $options['approval_success_message'] 
+                : __('Your account has been approved! You can now log in.', 'custom-auth-lockdown');
+        } else {
+            $subject = sprintf(__('[%s] Registration Status'), get_option('blogname'));
+            $message = isset($options['approval_rejection_message']) && !empty($options['approval_rejection_message']) 
+                ? $options['approval_rejection_message'] 
+                : __('Your registration has been rejected.', 'custom-auth-lockdown');
+        }
+        
+        $message .= "\n\n" . sprintf(__('Site: %s'), get_option('blogname'));
+        $message .= "\n" . sprintf(__('Username: %s'), $user->user_login);
+        
+        if ($status === 'approved') {
+            $login_url = wp_login_url();
+            // Check for custom login page
+            $custom_options = get_option('cal_options', array());
+            if (!empty($custom_options['custom_login_page'])) {
+                $login_url = get_permalink($custom_options['custom_login_page']);
+            }
+            $message .= "\n\n" . sprintf(__('Login here: %s'), $login_url);
+        }
+        
+        wp_mail($user->user_email, $subject, $message);
+        
+        // Also notify admin
+        if ($status === 'pending') {
+            $admin_email = get_option('admin_email');
+            $admin_subject = sprintf(__('[%s] New User Registration'), get_option('blogname'));
+            $admin_message = sprintf(__('A new user has registered and is pending approval:'), get_option('blogname')) . "\n\n";
+            $admin_message .= sprintf(__('Username: %s'), $user->user_login) . "\n";
+            $admin_message .= sprintf(__('Email: %s'), $user->user_email) . "\n";
+            $admin_message .= sprintf(__('Registration Date: %s'), date_i18n(get_option('date_format'), strtotime($user->user_registered))) . "\n\n";
+            $admin_message .= sprintf(__('Manage pending users: %s'), admin_url('users.php?cal_filter=pending'));
+            
+            wp_mail($admin_email, $admin_subject, $admin_message);
+        }
+    }
+    
+    public function bulk_approve_users_ajax() {
+        check_ajax_referer('cal_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('You do not have sufficient permissions.', 'custom-auth-lockdown'));
+        }
+        
+        $user_ids = isset($_POST['user_ids']) ? array_map('absint', $_POST['user_ids']) : array();
+        if (empty($user_ids)) {
+            wp_send_json_error(__('No users selected.', 'custom-auth-lockdown'));
+        }
+        
+        $approved_count = 0;
+        $options = get_option('cal_options', array());
+        
+        foreach ($user_ids as $user_id) {
+            $user = get_user_by('id', $user_id);
+            if ($user) {
+                // Update user approval status
+                update_user_meta($user_id, 'cal_approval_status', 'approved');
+                
+                // Send approval email
+                if (isset($options['send_approval_emails']) && $options['send_approval_emails']) {
+                    $this->send_approval_email($user, 'approved');
+                }
+                
+                $approved_count++;
+            }
+        }
+        
+        wp_send_json_success(array(
+            'message' => sprintf(_n('%d user approved successfully.', '%d users approved successfully.', $approved_count, 'custom-auth-lockdown'), $approved_count),
+            'count' => $approved_count
+        ));
+    }
+    
+    public function bulk_reject_users_ajax() {
+        check_ajax_referer('cal_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('You do not have sufficient permissions.', 'custom-auth-lockdown'));
+        }
+        
+        $user_ids = isset($_POST['user_ids']) ? array_map('absint', $_POST['user_ids']) : array();
+        if (empty($user_ids)) {
+            wp_send_json_error(__('No users selected.', 'custom-auth-lockdown'));
+        }
+        
+        $rejected_count = 0;
+        $options = get_option('cal_options', array());
+        
+        foreach ($user_ids as $user_id) {
+            $user = get_user_by('id', $user_id);
+            if ($user) {
+                // Update user approval status
+                update_user_meta($user_id, 'cal_approval_status', 'rejected');
+                
+                // Send rejection email
+                if (isset($options['send_approval_emails']) && $options['send_approval_emails']) {
+                    $this->send_approval_email($user, 'rejected');
+                }
+                
+                $rejected_count++;
+            }
+        }
+        
+        wp_send_json_success(array(
+            'message' => sprintf(_n('%d user rejected successfully.', '%d users rejected successfully.', $rejected_count, 'custom-auth-lockdown'), $rejected_count),
+            'count' => $rejected_count
+        ));
+    }
+    
+    public function migrate_existing_users_ajax() {
+        check_ajax_referer('cal_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('You do not have sufficient permissions.', 'custom-auth-lockdown'));
+        }
+        
+        // Get all users without approval status
+        $users = get_users(array(
+            'meta_query' => array(
+                array(
+                    'key' => 'cal_approval_status',
+                    'compare' => 'NOT EXISTS'
+                )
+            ),
+            'fields' => 'ID'
+        ));
+        
+        $migrated_count = 0;
+        
+        // Set all existing users as approved
+        foreach ($users as $user_id) {
+            update_user_meta($user_id, 'cal_approval_status', 'approved');
+            $migrated_count++;
+        }
+        
+        // Mark migration as complete
+        update_option('cal_user_approval_migration_done', true);
+        
+        wp_send_json_success(array(
+            'message' => sprintf(_n('%d existing user migrated to approved status.', '%d existing users migrated to approved status.', $migrated_count, 'custom-auth-lockdown'), $migrated_count),
+            'count' => $migrated_count
+        ));
+    }
+    
+    public function emergency_disable_ajax() {
+        check_ajax_referer('cal_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('You do not have sufficient permissions.', 'custom-auth-lockdown'));
+        }
+        
+        // Get current options
+        $options = get_option('cal_options', array());
+        
+        // Disable both problematic features
+        $options['require_admin_approval'] = false;
+        $options['disable_wp_login'] = false;
+        
+        // Update options
+        update_option('cal_options', $options);
+        
+        wp_send_json_success(array(
+            'message' => __('Emergency disable complete. Both "Require Admin Approval" and "Disable WP Login Access" have been turned off. Please test your login now.', 'custom-auth-lockdown')
+        ));
     }
 }

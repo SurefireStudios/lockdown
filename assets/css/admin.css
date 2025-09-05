@@ -238,3 +238,162 @@
 .cal-info-box .button {
     margin-top: 10px;
 }
+
+/* User Approval Styles */
+.cal-pending-users-list {
+    margin-top: 15px;
+}
+
+.cal-pending-users-list table {
+    margin-top: 10px;
+}
+
+.cal-pending-users-list .button {
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+
+.cal-pending-users-list .button-primary {
+    background-color: #00a32a;
+    border-color: #00a32a;
+}
+
+.cal-pending-users-list .button-primary:hover {
+    background-color: #008a20;
+    border-color: #008a20;
+}
+
+.cal-pending-users-list .cal-reject-user {
+    background-color: #d63638;
+    border-color: #d63638;
+    color: #ffffff;
+}
+
+.cal-pending-users-list .cal-reject-user:hover {
+    background-color: #b32d2e;
+    border-color: #b32d2e;
+    color: #ffffff;
+}
+
+/* User approval status colors */
+.cal-approval-status-pending {
+    color: #ff6b6b;
+    font-weight: 600;
+}
+
+.cal-approval-status-approved {
+    color: #51cf66;
+    font-weight: 600;
+}
+
+.cal-approval-status-rejected {
+    color: #868e96;
+    font-weight: 600;
+}
+
+/* Approval settings section */
+.cal-approval-settings {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 20px;
+    margin: 15px 0;
+}
+
+.cal-approval-settings h4 {
+    margin-top: 0;
+    color: #495057;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 10px;
+}
+
+/* User row actions styling */
+.user-row-actions .cal-approve-user {
+    color: #00a32a;
+}
+
+.user-row-actions .cal-reject-user {
+    color: #d63638;
+}
+
+.user-row-actions .cal-approve-user:hover,
+.user-row-actions .cal-reject-user:hover {
+    text-decoration: underline;
+}
+
+/* Notice improvements */
+.notice.cal-user-action-notice {
+    border-left-width: 4px;
+    border-left-style: solid;
+    margin: 15px 0 5px;
+    padding: 12px;
+}
+
+.notice.cal-user-action-notice.notice-success {
+    border-left-color: #00a32a;
+    background-color: #f0f8f0;
+}
+
+.notice.cal-user-action-notice.notice-error {
+    border-left-color: #d63638;
+    background-color: #fdf0f0;
+}
+
+/* Loading state for approval buttons */
+.cal-approve-user.loading,
+.cal-reject-user.loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Empty state */
+.cal-no-pending-users {
+    text-align: center;
+    padding: 40px 20px;
+    color: #646970;
+    font-style: italic;
+}
+
+.cal-no-pending-users .dashicons {
+    font-size: 48px;
+    margin-bottom: 15px;
+    color: #c3c4c7;
+}
+
+/* Bulk approval actions */
+.cal-bulk-approval-actions {
+    margin: 15px 0;
+    padding: 15px;
+    background: #f6f7f7;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+}
+
+.cal-bulk-approval-actions .button {
+    margin-right: 10px;
+}
+
+/* Tab content specific to user approval */
+#user-approval .form-table th {
+    width: 220px;
+}
+
+#user-approval .form-table textarea {
+    width: 100%;
+    max-width: 500px;
+    min-height: 80px;
+}
+
+/* Settings validation */
+.cal-setting-error {
+    color: #d63638;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+.cal-setting-warning {
+    color: #f56e28;
+    font-weight: 600;
+    margin-left: 10px;
+}

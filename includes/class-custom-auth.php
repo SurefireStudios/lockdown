@@ -18,8 +18,6 @@ class CAL_Custom_Auth {
     private $options;
     
     public function __construct() {
-        $this->options = get_option('cal_options', array());
-        
         // Handle login redirects
         add_filter('login_url', array($this, 'custom_login_url'), 10, 3);
         add_filter('register_url', array($this, 'custom_register_url'));
@@ -27,6 +25,9 @@ class CAL_Custom_Auth {
         
         // Handle wp-login.php redirects
         add_action('init', array($this, 'redirect_wp_login'));
+        
+        // Block unapproved users from WordPress login (but skip for administrators)
+        add_filter('wp_authenticate_user', array($this, 'check_user_approval_on_login'), 10, 2);
         
         // Handle form submissions
         add_action('wp_ajax_nopriv_cal_login', array($this, 'handle_login'));
@@ -48,6 +49,30 @@ class CAL_Custom_Auth {
     }
     
     public function custom_login_url($login_url, $redirect, $force_reauth) {
+        // Refresh options to get current settings
+        $this->options = get_option('cal_options', array());
+        
+        // If disable_wp_login is turned off, don't modify login URL at all
+        if (!isset($this->options['disable_wp_login']) || !$this->options['disable_wp_login']) {
+            return $login_url;
+        }
+        
+        // If this is a forced reauth and user is already logged in, don't use custom login
+        if ($force_reauth && is_user_logged_in()) {
+            return $login_url;
+        }
+        
+        // Check if redirect contains our custom login page to prevent loops
+        if ($redirect) {
+            $custom_login_page = isset($this->options['custom_login_page']) ? $this->options['custom_login_page'] : '';
+            if ($custom_login_page) {
+                $custom_login_url = get_permalink($custom_login_page);
+                if (strpos($redirect, $custom_login_url) !== false) {
+                    return $login_url; // Use default login to break the loop
+                }
+            }
+        }
+        
         $custom_login_page = isset($this->options['custom_login_page']) ? $this->options['custom_login_page'] : '';
         
         if ($custom_login_page) {
@@ -89,6 +114,9 @@ class CAL_Custom_Auth {
     }
     
     public function redirect_wp_login() {
+        // Refresh options to get current settings
+        $this->options = get_option('cal_options', array());
+        
         // Only redirect if disable_wp_login is enabled
         if (!isset($this->options['disable_wp_login']) || !$this->options['disable_wp_login']) {
             return;
@@ -97,6 +125,28 @@ class CAL_Custom_Auth {
         global $pagenow;
         
         if ($pagenow === 'wp-login.php' && !isset($_GET['action'])) {
+            // Don't redirect if this is a reauth request
+            if (isset($_GET['reauth']) && $_GET['reauth'] == '1') {
+                return;
+            }
+            
+            // Don't redirect if the redirect_to contains our custom login page (prevents loops)
+            if (isset($_GET['redirect_to'])) {
+                $redirect_to = urldecode($_GET['redirect_to']);
+                $custom_login_page = isset($this->options['custom_login_page']) ? $this->options['custom_login_page'] : '';
+                if ($custom_login_page) {
+                    $custom_login_url = get_permalink($custom_login_page);
+                    if (strpos($redirect_to, $custom_login_url) !== false) {
+                        return; // Prevent recursive loops
+                    }
+                }
+            }
+            
+            // Don't redirect if user is already logged in and this might be an admin function
+            if (is_user_logged_in()) {
+                return;
+            }
+            
             $custom_login_page = isset($this->options['custom_login_page']) ? $this->options['custom_login_page'] : '';
             
             if ($custom_login_page) {
@@ -116,6 +166,9 @@ class CAL_Custom_Auth {
     public function handle_login() {
         check_ajax_referer('cal_nonce', 'nonce');
         
+        // Refresh options to get current settings
+        $this->options = get_option('cal_options', array());
+        
         $username = sanitize_user($_POST['username']);
         $password = $_POST['password'];
         $remember = isset($_POST['remember']) ? true : false;
@@ -133,12 +186,45 @@ class CAL_Custom_Auth {
             'remember' => $remember
         );
         
-        $user = wp_signon($creds, false);
+        $user = wp_signon($creds, is_ssl());
         
         if (is_wp_error($user)) {
             wp_send_json_error(array(
                 'message' => $user->get_error_message()
             ));
+        }
+        
+        // Check if user approval is required and user is pending
+        // Skip approval check for administrators to prevent lockouts
+        $require_approval = isset($this->options['require_admin_approval']) ? $this->options['require_admin_approval'] : false;
+        if ($require_approval && !user_can($user->ID, 'manage_options')) {
+            $approval_status = get_user_meta($user->ID, 'cal_approval_status', true);
+            
+            // Only block if specifically pending or rejected - treat empty as approved
+            if ($approval_status === 'pending') {
+                // Logout the user immediately
+                wp_logout();
+                
+                $pending_message = isset($this->options['approval_pending_message']) && !empty($this->options['approval_pending_message']) 
+                    ? $this->options['approval_pending_message'] 
+                    : __('Your account is pending administrator approval. Please wait for approval before logging in.', 'custom-auth-lockdown');
+                
+                wp_send_json_error(array(
+                    'message' => $pending_message
+                ));
+            } elseif ($approval_status === 'rejected') {
+                // Logout the user immediately
+                wp_logout();
+                
+                $rejection_message = isset($this->options['approval_rejection_message']) && !empty($this->options['approval_rejection_message']) 
+                    ? $this->options['approval_rejection_message'] 
+                    : __('Your registration has been rejected.', 'custom-auth-lockdown');
+                
+                wp_send_json_error(array(
+                    'message' => $rejection_message
+                ));
+            }
+            // If empty or 'approved', allow login to continue without modifying user meta
         }
         
         // Successful login - determine redirect URL
@@ -152,6 +238,9 @@ class CAL_Custom_Auth {
     
     public function handle_register() {
         check_ajax_referer('cal_nonce', 'nonce');
+        
+        // Refresh options to get current settings
+        $this->options = get_option('cal_options', array());
         
         if (!get_option('users_can_register')) {
             wp_send_json_error(array(
@@ -206,23 +295,47 @@ class CAL_Custom_Auth {
             ));
         }
         
-        // Auto-login after registration
-        $creds = array(
-            'user_login' => $username,
-            'user_password' => $password,
-            'remember' => true
-        );
+        // Check if admin approval is required
+        $require_approval = isset($this->options['require_admin_approval']) ? $this->options['require_admin_approval'] : false;
         
-        wp_signon($creds, false);
-        
-        // Get user object for redirect
-        $user = get_user_by('id', $user_id);
-        $redirect_url = $this->get_login_redirect_url($user, '');
-        
-        wp_send_json_success(array(
-            'message' => __('Registration successful! Welcome!', 'custom-auth-lockdown'),
-            'redirect_url' => $redirect_url
-        ));
+        if ($require_approval) {
+            // Set user status to pending
+            update_user_meta($user_id, 'cal_approval_status', 'pending');
+            
+            // Get user object
+            $user = get_user_by('id', $user_id);
+            
+            // Send notification emails
+            if (isset($this->options['send_approval_emails']) && $this->options['send_approval_emails']) {
+                $this->send_registration_notification($user);
+            }
+            
+            wp_send_json_success(array(
+                'message' => __('Registration successful! Your account is pending administrator approval. You will receive an email notification once approved.', 'custom-auth-lockdown'),
+                'redirect_url' => home_url()
+            ));
+        } else {
+            // Set user status to approved (default behavior)
+            update_user_meta($user_id, 'cal_approval_status', 'approved');
+            
+            // Auto-login after registration
+            $creds = array(
+                'user_login' => $username,
+                'user_password' => $password,
+                'remember' => true
+            );
+            
+            wp_signon($creds, is_ssl());
+            
+            // Get user object for redirect
+            $user = get_user_by('id', $user_id);
+            $redirect_url = $this->get_login_redirect_url($user, '');
+            
+            wp_send_json_success(array(
+                'message' => __('Registration successful! Welcome!', 'custom-auth-lockdown'),
+                'redirect_url' => $redirect_url
+            ));
+        }
     }
     
     public function handle_forgot_password() {
@@ -348,6 +461,19 @@ class CAL_Custom_Auth {
     public function handle_wp_login_redirect($redirect_to, $request, $user) {
         // Only handle successful logins
         if (!isset($user->ID)) {
+            return $redirect_to;
+        }
+        
+        // If this is a reauth request, always preserve the redirect_to parameter
+        if (isset($_REQUEST['reauth']) && $_REQUEST['reauth'] == '1') {
+            return $redirect_to;
+        }
+        
+        // If redirect_to is explicitly set to wp-admin or admin area, don't override it
+        if (!empty($redirect_to) && (
+            strpos($redirect_to, 'wp-admin') !== false || 
+            strpos($redirect_to, admin_url()) !== false
+        )) {
             return $redirect_to;
         }
         
@@ -538,5 +664,79 @@ class CAL_Custom_Auth {
             'last_name' => $user->last_name,
             'avatar' => get_avatar_url($user->ID)
         );
+    }
+    
+    /**
+     * Check user approval status during WordPress login
+     */
+    public function check_user_approval_on_login($user, $password) {
+        // Skip if it's an error or not a user object
+        if (is_wp_error($user) || !$user) {
+            return $user;
+        }
+        
+        // Skip approval check for super admins and administrators to prevent lockouts
+        if (is_super_admin($user->ID) || user_can($user->ID, 'manage_options') || in_array('administrator', $user->roles)) {
+            return $user;
+        }
+        
+        // Refresh options to get current settings
+        $this->options = get_option('cal_options', array());
+        
+        // Check if admin approval is required
+        $require_approval = isset($this->options['require_admin_approval']) ? $this->options['require_admin_approval'] : false;
+        if (!$require_approval) {
+            return $user;
+        }
+        
+        $approval_status = get_user_meta($user->ID, 'cal_approval_status', true);
+        
+        // If no approval status exists, treat as approved (existing users before this feature)
+        if (empty($approval_status)) {
+            update_user_meta($user->ID, 'cal_approval_status', 'approved');
+            return $user;
+        }
+        
+        if ($approval_status === 'pending') {
+            $pending_message = isset($this->options['approval_pending_message']) && !empty($this->options['approval_pending_message']) 
+                ? $this->options['approval_pending_message'] 
+                : __('Your account is pending administrator approval. Please wait for approval before logging in.', 'custom-auth-lockdown');
+            
+            return new WP_Error('pending_approval', $pending_message);
+        } elseif ($approval_status === 'rejected') {
+            $rejection_message = isset($this->options['approval_rejection_message']) && !empty($this->options['approval_rejection_message']) 
+                ? $this->options['approval_rejection_message'] 
+                : __('Your registration has been rejected.', 'custom-auth-lockdown');
+            
+            return new WP_Error('registration_rejected', $rejection_message);
+        }
+        
+        return $user;
+    }
+    
+    /**
+     * Send registration notification emails
+     */
+    private function send_registration_notification($user) {
+        // Send email to admin
+        $admin_email = get_option('admin_email');
+        $admin_subject = sprintf(__('[%s] New User Registration Pending Approval'), get_option('blogname'));
+        $admin_message = sprintf(__('A new user has registered and is pending your approval:')) . "\n\n";
+        $admin_message .= sprintf(__('Username: %s'), $user->user_login) . "\n";
+        $admin_message .= sprintf(__('Email: %s'), $user->user_email) . "\n";
+        $admin_message .= sprintf(__('Registration Date: %s'), date_i18n(get_option('date_format'), strtotime($user->user_registered))) . "\n\n";
+        $admin_message .= sprintf(__('To approve or reject this user, visit: %s'), admin_url('users.php?cal_filter=pending'));
+        
+        wp_mail($admin_email, $admin_subject, $admin_message);
+        
+        // Send confirmation email to user
+        $user_subject = sprintf(__('[%s] Registration Received'), get_option('blogname'));
+        $user_message = sprintf(__('Thank you for registering at %s!'), get_option('blogname')) . "\n\n";
+        $user_message .= __('Your account is currently pending administrator approval. You will receive an email notification once your account has been reviewed.') . "\n\n";
+        $user_message .= sprintf(__('Username: %s'), $user->user_login) . "\n";
+        $user_message .= sprintf(__('Email: %s'), $user->user_email) . "\n\n";
+        $user_message .= sprintf(__('If you have any questions, please contact the site administrator at %s'), $admin_email);
+        
+        wp_mail($user->user_email, $user_subject, $user_message);
     }
 }
